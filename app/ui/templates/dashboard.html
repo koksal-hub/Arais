@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <title>YouTube Analytics Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+</head>
+<body>
+    <main class="container">
+        <h1>Kanal {{ channel_id }} Performans Özeti</h1>
+        <section>
+            <ul>
+                <li>İzlenme: {{ snapshot.views }}</li>
+                <li>İzlenme Süresi: {{ snapshot.watch_time }} dakika</li>
+                <li>Aboneler: {{ snapshot.subs }}</li>
+                <li>Tıklanma Oranı (CTR): {{ snapshot.ctr }}%</li>
+                <li>Öne Çıkan Videolar: {{ snapshot.top_videos }}</li>
+                <li>Ölçüm Zamanı: {{ snapshot.captured_at }}</li>
+            </ul>
+        </section>
+    </main>
+</body>
+</html>
