@@ -1,17 +1,21 @@
 # ULTRA Finans Ajanı
 
-Windows masaüstünde çalışan, kripto ve borsa verilerini aynı çatı altında izleyen; uzman ajanlar, bağımsız risk motoru ve sanal işlem sistemi kullanan araştırma uygulaması.
+Windows masaüstünde çalışan; kripto ve ileride borsa verilerini aynı çatı altında izleyen, dar görevli uzman ajanlar, bağımsız risk motoru, teknik laboratuvar ve sanal işlem sistemi kullanan araştırma uygulaması.
 
-> Bu sürüm yalnızca analiz ve **sanal işlem** içindir. Gerçek emir, kaldıraç ve para çekme yetkisi yoktur.
+> **v0.2 yalnızca analiz, backtest ve sanal işlem içindir.** Gerçek emir, kaldıraç, vadeli işlem ve para çekme yetkisi yoktur.
 
-## v0.1 hedefi
+## v0.2 ile gelenler
 
-- Binance ve BtcTurk halka açık piyasa verilerini okuma
-- Verileri SQLite'a kaydetme
-- Teknik, rejim ve risk ajanlarının ilk çalışan sürümü
-- Sanal portföy ve işlem günlüğü
-- Windows masaüstü paneli
-- Ağ bağlantısı yoksa güvenli biçimde çevrimdışı kalma
+- Binance halka açık API üzerinden 1 saatlik OHLCV mumları
+- İnternet yoksa açıkça işaretlenen deterministik demo veri
+- SMA20/50, EMA12/26, RSI14, MACD, ATR14 ve Bollinger Bantları
+- Hacim oranı, destek/direnç ve matematiksel mum formasyonları
+- Teknik, rejim, hacim ve risk ajanlarından oluşan Ajanlar Kurulu
+- Yüksek ATR oynaklığında bağımsız işlem engeli
+- SQLite mum, karar, sanal emir ve backtest kayıtları
+- 1.250 TL kripto ve 10.000 TL Borsa İstanbul sanal hesapları
+- Komisyon ve kayma içeren, sonraki mum açılışında işlem yapan backtest
+- Acil durdurma, %20 pozisyon sınırı, %25 rezerv ve %65 güven eşiği
 
 ## Çalıştırma
 
@@ -23,14 +27,30 @@ py -m venv .venv
 py app.py
 ```
 
-Bu ilk sürüm yalnızca Python standart kütüphanesini kullanır.
+Bu sürüm yalnızca Python standart kütüphanesini kullanır.
+
+## Testler
+
+```powershell
+py -m unittest discover -s tests -v
+```
 
 ## Güvenlik anayasası
 
 1. Gerçek emir kapalıdır.
 2. API anahtarı istenmez ve kodda tutulmaz.
-3. LLM veya haber ajanı doğrudan emir gönderemez.
-4. Her öneri bağımsız risk motorundan geçer.
-5. Ağ/veri hatasında sistem yeni işlem açmaz.
-6. Komisyon, spread ve kayma raporlarda ayrıca izlenir.
-7. İlk hedef yüksek kâr değil; tekrarlanabilir ve denetlenebilir bir sistemdir.
+3. Yapay zekâ veya haber ajanı doğrudan emir gönderemez.
+4. Her yeni pozisyon bağımsız risk motorundan geçer.
+5. Ağ/veri hatasında sistem demo modunu açıkça gösterir.
+6. Komisyon, spread ve kayma sonuçlardan saklanmaz.
+7. Backtest, aynı mumun kapanış sinyalini aynı mumda işleme sokmaz.
+8. İlk hedef yüksek kâr değil; tekrar üretilebilir, denetlenebilir ve sermayeyi koruyan sistemdir.
+
+## Sonraki kapı: v0.3
+
+- Çoklu zaman dilimi
+- Walk-forward deney yöneticisi
+- Strateji şampiyon/adayı karşılaştırması
+- Günlük zarar ve ardışık kayıp kayıtlarının otomatik hesaplanması
+- KAP ve BIST veri katmanı
+- Bilimsel makale kütüphanesi ve deney kartları
