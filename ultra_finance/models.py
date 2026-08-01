@@ -84,6 +84,20 @@ class TechnicalSnapshot:
     resistance: float | None
     patterns: tuple[str, ...]
     reasons: tuple[str, ...]
+    strategy_name: str = "Dengeli"
+    interval: str = "1h"
+
+
+@dataclass(frozen=True)
+class MultiTimeframeSnapshot:
+    symbol: str
+    primary_interval: str
+    confirmation_interval: str
+    primary: TechnicalSnapshot
+    confirmation: TechnicalSnapshot
+    decision: Decision
+    alignment: str
+    reasons: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -100,4 +114,44 @@ class BacktestResult:
     win_rate_pct: float
     profit_factor: float | None
     total_fees: float
+    notes: str
+    strategy_name: str = "Dengeli"
+
+
+@dataclass(frozen=True)
+class WalkForwardFold:
+    fold: int
+    train_start: str
+    train_end: str
+    test_start: str
+    test_end: str
+    selected_strategy: str
+    train_score: float
+    test_return_pct: float
+    test_benchmark_pct: float
+    test_drawdown_pct: float
+    trades: int
+
+
+@dataclass(frozen=True)
+class StrategyLeaderboardEntry:
+    strategy_name: str
+    folds: int
+    average_test_return_pct: float
+    median_test_return_pct: float
+    average_drawdown_pct: float
+    total_trades: int
+    positive_folds: int
+    robustness_score: float
+
+
+@dataclass(frozen=True)
+class WalkForwardResult:
+    symbol: str
+    champion: str
+    challenger: str | None
+    folds: tuple[WalkForwardFold, ...]
+    leaderboard: tuple[StrategyLeaderboardEntry, ...]
+    selected_strategy_return_pct: float
+    selected_strategy_benchmark_pct: float
     notes: str
