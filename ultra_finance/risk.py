@@ -11,6 +11,8 @@ class RiskLimits:
     min_confidence: float = 0.65
     fee_rate: float = 0.001
     reserve_cash_pct: float = 0.25
+    max_daily_loss_pct: float = 0.03
+    max_consecutive_losses: int = 3
 
 
 @dataclass(frozen=True)
@@ -24,7 +26,20 @@ class RiskManager:
     def __init__(self, limits: RiskLimits | None = None) -> None:
         self.limits = limits or RiskLimits()
 
-    def review(self, decision: Decision, cash_try: float) -> RiskResult:
+    def review(
+        self,
+        decision: Decision,
+        cash_try: float,
+        daily_loss_pct: float = 0.0,
+        consecutive_losses: int = 0,
+        emergency_stop: bool = False,
+    ) -> RiskResult:
+        if emergency_stop:
+            return RiskResult(False, 0.0, "Acil durdurma aktif.")
+        if daily_loss_pct >= self.limits.max_daily_loss_pct:
+            return RiskResult(False, 0.0, "Günlük zarar limiti aşıldı.")
+        if consecutive_losses >= self.limits.max_consecutive_losses:
+            return RiskResult(False, 0.0, "Arka arkaya zarar limiti aşıldı.")
         if decision.signal in (Signal.WAIT, Signal.BLOCK):
             return RiskResult(False, 0.0, "Karar işlem açmaya uygun değil.")
         if decision.confidence < self.limits.min_confidence:
