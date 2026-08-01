@@ -3,6 +3,7 @@ from __future__ import annotations
 from statistics import mean, pstdev
 
 from .models import Candle, MarketRegime, Signal, TechnicalSnapshot
+from .strategies import BALANCED, StrategyConfig
 
 
 def sma(values: list[float], period: int) -> float | None:
@@ -88,45 +89,56 @@ def candle_patterns(candles: list[Candle]) -> tuple[str, ...]:
 
 
 class TechnicalAnalyzer:
-    MIN_CANDLES = 55
+    def __init__(self, config: StrategyConfig | None = None) -> None:
+        self.config = config or BALANCED
+        self.min_candles = max(
+            self.config.sma_slow,
+            self.config.ema_slow + 10,
+            self.config.bollinger_period,
+            self.config.atr_period + 2,
+            self.config.rsi_period + 2,
+        ) + 5
 
     def analyze(self, candles: list[Candle]) -> TechnicalSnapshot:
         if not candles:
             raise ValueError("Teknik analiz için mum verisi gerekli.")
+        config = self.config
         symbol = candles[-1].symbol
+        interval = candles[-1].interval
         closes = [c.close for c in candles]
         volumes = [c.volume for c in candles]
         close = closes[-1]
-        fast_sma = sma(closes, 20)
-        slow_sma = sma(closes, 50)
-        ema12_series = ema_series(closes, 12)
-        ema26_series = ema_series(closes, 26)
-        fast_ema = ema12_series[-1] if ema12_series else None
-        slow_ema = ema26_series[-1] if ema26_series else None
-        macd_series = [a - b for a, b in zip(ema12_series, ema26_series)]
+        fast_sma = sma(closes, config.sma_fast)
+        slow_sma = sma(closes, config.sma_slow)
+        ema_fast_series = ema_series(closes, config.ema_fast)
+        ema_slow_series = ema_series(closes, config.ema_slow)
+        fast_ema = ema_fast_series[-1] if ema_fast_series else None
+        slow_ema = ema_slow_series[-1] if ema_slow_series else None
+        macd_series = [a - b for a, b in zip(ema_fast_series, ema_slow_series)]
         macd_value = macd_series[-1] if macd_series else None
         macd_signal_series = ema_series(macd_series, 9)
         macd_signal_value = macd_signal_series[-1] if macd_signal_series else None
-        rsi_value = rsi(closes, 14)
-        atr_value = atr(candles, 14)
+        rsi_value = rsi(closes, config.rsi_period)
+        atr_value = atr(candles, config.atr_period)
         atr_pct = (atr_value / close) if atr_value is not None and close else None
-        upper, lower = bollinger(closes, 20)
+        upper, lower = bollinger(closes, config.bollinger_period)
         volume_avg = mean(volumes[-20:]) if len(volumes) >= 20 else None
         volume_ratio = (volumes[-1] / volume_avg) if volume_avg else None
         support = min(c.low for c in candles[-20:]) if len(candles) >= 20 else None
         resistance = max(c.high for c in candles[-20:]) if len(candles) >= 20 else None
         patterns = candle_patterns(candles)
 
-        if len(candles) < self.MIN_CANDLES:
+        if len(candles) < self.min_candles:
             return TechnicalSnapshot(
                 symbol, MarketRegime.UNKNOWN, Signal.WAIT, 50.0, 0.35, close,
                 fast_sma, slow_sma, fast_ema, slow_ema, rsi_value, macd_value,
                 macd_signal_value, atr_value, atr_pct, upper, lower, volume_ratio,
-                support, resistance, patterns, (f"En az {self.MIN_CANDLES} mum gerekli.",),
+                support, resistance, patterns, (f"En az {self.min_candles} mum gerekli.",),
+                config.name, interval,
             )
 
         regime = MarketRegime.SIDEWAYS
-        if atr_pct is not None and atr_pct >= 0.055:
+        if atr_pct is not None and atr_pct >= config.max_atr_pct:
             regime = MarketRegime.HIGH_VOLATILITY
         elif fast_sma and slow_sma and fast_ema and slow_ema:
             if fast_sma > slow_sma * 1.004 and fast_ema > slow_ema and close > fast_sma:
@@ -139,17 +151,17 @@ class TechnicalAnalyzer:
         if fast_sma is not None and slow_sma is not None:
             if fast_sma > slow_sma:
                 score += 12
-                reasons.append("SMA20, SMA50 üzerinde.")
+                reasons.append(f"SMA{config.sma_fast}, SMA{config.sma_slow} üzerinde.")
             else:
                 score -= 12
-                reasons.append("SMA20, SMA50 altında.")
+                reasons.append(f"SMA{config.sma_fast}, SMA{config.sma_slow} altında.")
         if fast_ema is not None and slow_ema is not None:
             if fast_ema > slow_ema:
                 score += 8
-                reasons.append("EMA12, EMA26 üzerinde.")
+                reasons.append(f"EMA{config.ema_fast}, EMA{config.ema_slow} üzerinde.")
             else:
                 score -= 8
-                reasons.append("EMA12, EMA26 altında.")
+                reasons.append(f"EMA{config.ema_fast}, EMA{config.ema_slow} altında.")
         if macd_value is not None and macd_signal_value is not None:
             if macd_value > macd_signal_value:
                 score += 8
@@ -170,7 +182,7 @@ class TechnicalAnalyzer:
             elif 35 <= rsi_value < 50:
                 score -= 4
                 reasons.append("RSI zayıf bölgede.")
-        if volume_ratio is not None and volume_ratio >= 1.20:
+        if volume_ratio is not None and volume_ratio >= config.volume_confirmation:
             direction = candles[-1].close - candles[-1].open
             score += 6 if direction > 0 else -6
             reasons.append("Hacim ortalamanın üzerinde ve son mum yönünü teyit ediyor.")
@@ -192,10 +204,10 @@ class TechnicalAnalyzer:
             signal = Signal.BLOCK
             confidence = 0.90
             reasons.insert(0, "ATR tabanlı oynaklık güvenlik eşiğini aştı.")
-        elif score >= 68:
+        elif score >= config.buy_score:
             signal = Signal.BUY
             confidence = min(0.92, 0.55 + (score - 50) / 100)
-        elif score <= 32:
+        elif score <= config.sell_score:
             signal = Signal.SELL
             confidence = min(0.92, 0.55 + (50 - score) / 100)
         else:
@@ -207,5 +219,5 @@ class TechnicalAnalyzer:
             symbol, regime, signal, score, confidence, close, fast_sma, slow_sma,
             fast_ema, slow_ema, rsi_value, macd_value, macd_signal_value,
             atr_value, atr_pct, upper, lower, volume_ratio, support, resistance,
-            patterns, tuple(reasons),
+            patterns, tuple(reasons), config.name, interval,
         )
