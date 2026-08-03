@@ -4,24 +4,33 @@ import math
 
 from .agents import AgentCouncil
 from .models import BacktestResult, Candle, Signal
+from .strategies import BALANCED, StrategyConfig
 
 
 class BacktestEngine:
     """Sinyali kapanışta üretir, işlemi bir sonraki mum açılışında uygular."""
 
-    def __init__(self, council: AgentCouncil | None = None) -> None:
-        self.council = council or AgentCouncil()
+    def __init__(self, config: StrategyConfig | None = None) -> None:
+        self.config = config or BALANCED
+        self.council = AgentCouncil(self.config)
 
     def run(
         self,
         candles: list[Candle],
         starting_cash: float = 1250.0,
-        fee_rate: float = 0.001,
-        slippage_bps: float = 5.0,
-        max_position_pct: float = 0.20,
-        reserve_cash_pct: float = 0.25,
-        warmup: int = 60,
+        fee_rate: float | None = None,
+        slippage_bps: float | None = None,
+        max_position_pct: float | None = None,
+        reserve_cash_pct: float | None = None,
+        warmup: int | None = None,
     ) -> BacktestResult:
+        config = self.config
+        fee_rate = config.fee_rate if fee_rate is None else fee_rate
+        slippage_bps = config.slippage_bps if slippage_bps is None else slippage_bps
+        max_position_pct = config.max_position_pct if max_position_pct is None else max_position_pct
+        reserve_cash_pct = config.reserve_cash_pct if reserve_cash_pct is None else reserve_cash_pct
+        minimum_warmup = self.council.analyzer.min_candles
+        warmup = max(minimum_warmup, warmup or minimum_warmup)
         if len(candles) <= warmup + 2:
             raise ValueError("Backtest için daha fazla mum gerekli.")
         cash = starting_cash
@@ -98,4 +107,5 @@ class BacktestEngine:
             profit_factor=profit_factor,
             total_fees=total_fees,
             notes="Gelecek veri kullanılmadı; sinyal kapanışta, işlem sonraki mum açılışında ve maliyetli uygulandı.",
+            strategy_name=config.name,
         )

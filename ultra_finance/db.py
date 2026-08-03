@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import contextmanager
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
-from .models import BacktestResult, Candle, MarketQuote
+from .models import BacktestResult, Candle, MarketQuote, WalkForwardResult
 
 
 class Database:
@@ -83,6 +85,7 @@ class Database:
                 CREATE TABLE IF NOT EXISTS backtest_runs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     symbol TEXT NOT NULL,
+                    strategy_name TEXT NOT NULL DEFAULT 'Dengeli',
                     starting_cash REAL NOT NULL,
                     ending_equity REAL NOT NULL,
                     net_return_pct REAL NOT NULL,
@@ -97,10 +100,30 @@ class Database:
                     notes TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS walk_forward_runs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT NOT NULL,
+                    champion TEXT NOT NULL,
+                    challenger TEXT,
+                    fold_count INTEGER NOT NULL,
+                    selected_return_pct REAL NOT NULL,
+                    benchmark_return_pct REAL NOT NULL,
+                    leaderboard_json TEXT NOT NULL,
+                    folds_json TEXT NOT NULL,
+                    notes TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
                 """
             )
+            self._ensure_column(con, "backtest_runs", "strategy_name", "TEXT NOT NULL DEFAULT 'Dengeli'")
             con.execute("INSERT OR IGNORE INTO accounts(name, cash_try) VALUES (?, ?)", ("Kripto Sanal", 1250.0))
             con.execute("INSERT OR IGNORE INTO accounts(name, cash_try) VALUES (?, ?)", ("Borsa Sanal", 10000.0))
+
+    @staticmethod
+    def _ensure_column(con: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+        columns = {row[1] for row in con.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in columns:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     def save_quote(self, quote: MarketQuote) -> None:
         with self.connect() as con:
@@ -163,14 +186,32 @@ class Database:
             con.execute(
                 """
                 INSERT INTO backtest_runs(
-                    symbol,starting_cash,ending_equity,net_return_pct,benchmark_return_pct,
+                    symbol,strategy_name,starting_cash,ending_equity,net_return_pct,benchmark_return_pct,
                     max_drawdown_pct,trades,wins,losses,win_rate_pct,profit_factor,total_fees,notes,created_at
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
-                    result.symbol, result.starting_cash, result.ending_equity, result.net_return_pct,
+                    result.symbol, result.strategy_name, result.starting_cash, result.ending_equity, result.net_return_pct,
                     result.benchmark_return_pct, result.max_drawdown_pct, result.trades, result.wins,
                     result.losses, result.win_rate_pct, result.profit_factor, result.total_fees,
+                    result.notes, datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+
+    def save_walk_forward(self, result: WalkForwardResult) -> None:
+        with self.connect() as con:
+            con.execute(
+                """
+                INSERT INTO walk_forward_runs(
+                    symbol,champion,challenger,fold_count,selected_return_pct,benchmark_return_pct,
+                    leaderboard_json,folds_json,notes,created_at
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    result.symbol, result.champion, result.challenger, len(result.folds),
+                    result.selected_strategy_return_pct, result.selected_strategy_benchmark_pct,
+                    json.dumps([asdict(item) for item in result.leaderboard], ensure_ascii=False),
+                    json.dumps([asdict(item) for item in result.folds], ensure_ascii=False),
                     result.notes, datetime.now(timezone.utc).isoformat(),
                 ),
             )
